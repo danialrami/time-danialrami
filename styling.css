@@ -208,24 +208,78 @@ body::after {
     white-space: nowrap;
 }
 
+/* Ring labels - with animated transitions */
+.ring-label {
+    position: absolute;
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(251, 249, 226, 0.5);
+    text-shadow: 
+        0 0 4px rgba(0, 0, 0, 0.9),
+        0 0 8px rgba(120, 190, 186, 0.2);
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.8px;
+    transform: translate(-50%, -50%);
+    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    text-align: center;
+    white-space: nowrap;
+}
+
 .ring-label.milliseconds { font-size: 7px; opacity: 0.6; }
 .ring-label.seconds { font-size: 8px; opacity: 0.6; }
 .ring-label.minutes { font-size: 9px; opacity: 0.5; }
-.ring-label.hours { font-size: 10px; opacity: 0.5; }
+.ring-label.hours { 
+    font-size: 10px; 
+    opacity: 0.5; 
+    font-weight: 500;
+    color: rgba(251, 249, 226, 0.5);
+    text-shadow: 
+        0 0 4px rgba(0, 0, 0, 0.9),
+        0 0 8px rgba(120, 190, 186, 0.2);
+}
 .ring-label.days { font-size: 10px; opacity: 0.5; }
+.ring-label.dayOfWeek { font-size: 10px; opacity: 0.5; }
 .ring-label.weeks { font-size: 11px; opacity: 0.4; }
 .ring-label.months { font-size: 11px; opacity: 0.4; }
 .ring-label.quarters { font-size: 12px; opacity: 0.4; }
 .ring-label.halves { font-size: 12px; opacity: 0.3; }
 .ring-label.year { font-size: 13px; opacity: 0.3; }
 
-/* Day view adjustments - now includes day ring */
+/* Day view adjustments - animated traditional clock layout */
 .day-view .ring-label.milliseconds,
-.day-view .ring-label.seconds,
-.day-view .ring-label.minutes,
-.day-view .ring-label.hours,
+.day-view .ring-label.seconds {
+    opacity: 0.5;
+    font-weight: 500;
+}
+
+.day-view .ring-label.hours {
+    font-size: 18px !important;
+    opacity: 1.0 !important;
+    font-weight: 700 !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    text-shadow: 
+        0 0 6px rgba(0, 0, 0, 0.9),
+        0 0 12px rgba(255, 255, 255, 0.4) !important;
+}
+
+.day-view .ring-label.minutes {
+    font-size: 12px;
+    opacity: 0.8;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9) !important;
+    text-shadow: 
+        0 0 4px rgba(0, 0, 0, 0.9),
+        0 0 8px rgba(255, 255, 255, 0.3) !important;
+}
+
 .day-view .ring-label.days {
-    opacity: 0.7;
+    opacity: 0.6;
+    font-weight: 600;
+}
+
+.day-view .ring-label.dayOfWeek {
+    opacity: 0.6;
     font-weight: 600;
 }
 

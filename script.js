@@ -29,42 +29,46 @@ class TemporalEngine {
         return preciseTime + this.timeOffset;
     }
 
-    calculateTemporalPositions(timestamp, viewMode = 'year') {
-        const date = new Date(timestamp);
+    calculateTemporalPositions() {
+        const now = performance.now();
+        const date = new Date();
         const positions = {};
 
         // Calculate milliseconds position (0-999ms)
-        const milliseconds = date.getMilliseconds();
-        positions.milliseconds = (milliseconds / 1000) * 360;
+        const totalMilliseconds = date.getMilliseconds() + (now % 1);
+        positions.milliseconds = (totalMilliseconds / 1000) * 360;
 
-        // Calculate seconds position with millisecond precision
-        const totalSeconds = date.getSeconds() + (milliseconds / 1000);
+        // Calculate seconds position (0-59s)
+        const totalSeconds = date.getSeconds() + (totalMilliseconds / 1000);
         positions.seconds = (totalSeconds / 60) * 360;
 
-        // Calculate minutes position with second precision
+        // Calculate minutes position (0-59min)
         const totalMinutes = date.getMinutes() + (totalSeconds / 60);
         positions.minutes = (totalMinutes / 60) * 360;
 
-        // Calculate hours position with minute precision - 12h vs 24h logic
+        // Calculate hours position (0-23h for Year View, 0-11h for Day View)
         const totalHours = date.getHours() + (totalMinutes / 60);
-        if (viewMode === 'day') {
-            // 12-hour format for day view
-            const hours12 = totalHours % 12;
-            positions.hours = (hours12 / 12) * 360;
-        } else {
-            // 24-hour format for year view
-            positions.hours = (totalHours / 24) * 360;
-        }
+        positions.hours = (totalHours / 24) * 360; // Year View: 24-hour
+        positions.hours12 = ((totalHours % 12) / 12) * 360; // Day View: 12-hour
 
-        // Calculate days position
+        // Calculate days position (1-31 days)
         const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
         const totalDays = date.getDate() + (totalHours / 24);
         positions.days = (totalDays / daysInMonth) * 360;
 
-        // Calculate weeks position (ISO 8601)
-        const weekNumber = this.getISOWeekNumber(date);
+        // Calculate day-of-week position (MON-SUN)
+        const dayOfWeek = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+        const hoursIntoDay = date.getHours() + (date.getMinutes() / 60) + (date.getSeconds() / 3600);
+        const totalDayOfWeek = dayOfWeek + (hoursIntoDay / 24);
+        positions.dayOfWeek = (totalDayOfWeek / 7) * 360;
+
+        // Calculate weeks position - FIXED: Use ISO week calculation for W26
+        const isoWeek = this.getISOWeekNumber(date);
         const weeksInYear = this.getWeeksInYear(date.getFullYear());
-        positions.weeks = (weekNumber / weeksInYear) * 360;
+        const dayInWeek = dayOfWeek; // Monday = 0, Sunday = 6
+        const hoursIntoWeek = dayInWeek * 24 + hoursIntoDay;
+        const weekProgress = (isoWeek - 1 + (hoursIntoWeek / (7 * 24))) / weeksInYear;
+        positions.weeks = weekProgress * 360;
 
         // Calculate months position
         const totalMonths = date.getMonth() + (totalDays / daysInMonth);
@@ -82,10 +86,11 @@ class TemporalEngine {
         const totalHalves = half + (monthInHalf + (totalDays / daysInMonth)) / 6;
         positions.halves = (totalHalves / 2) * 360;
 
-        // Calculate year position (day of year)
-        const dayOfYear = this.getDayOfYear(date);
-        const daysInYear = this.isLeapYear(date.getFullYear()) ? 366 : 365;
-        positions.year = (dayOfYear / daysInYear) * 360;
+        // Calculate year position
+        const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+        const daysInYear = ((date.getFullYear() % 4 === 0 && date.getFullYear() % 100 !== 0) || date.getFullYear() % 400 === 0) ? 366 : 365;
+        const totalYear = (dayOfYear + (hoursIntoDay / 24)) / daysInYear;
+        positions.year = totalYear * 360;
 
         return positions;
     }
@@ -154,7 +159,7 @@ class TemporalEngine {
     }
 }
 
-// Enhanced Color System with LUFS palette integration and ROYGBIV Day View
+// Enhanced Color System with Flowing ROYGBIV Wave
 class ColorSystem {
     constructor() {
         // LUFS color palette
@@ -166,46 +171,113 @@ class ColorSystem {
             black: '#111111',
             white: '#fbf9e2'
         };
-
-        // Enhanced spectral map incorporating LUFS colors
+        
+        // ROYGBIV spectrum for flowing wave
+        this.roygbivSpectrum = [
+            '#FF0000', // Red
+            '#FF7F00', // Orange  
+            '#FFFF00', // Yellow
+            '#00FF00', // Green
+            '#0000FF', // Blue
+            '#4B0082', // Indigo
+            '#9400D3'  // Violet
+        ];
+        
+        // Wave parameters for very slow, almost imperceptible effect
+        this.waveSpeed = 0.00002; // Much much slower - almost imperceptible
+        this.waveLength = 4.0;   // How many colors span the wave
+        
+        // Enhanced spectral map for Year View with day-of-week ring
         this.spectralMap = {
             milliseconds: { hue: 350, saturation: 70, lightness: 60 },  // Pink-red
-            seconds: { hue: 0, saturation: 75, lightness: 55 },         // Red (LUFS red)
+            seconds: { hue: 0, saturation: 75, lightness: 55 },         // Red
             minutes: { hue: 30, saturation: 80, lightness: 60 },        // Orange
-            hours: { hue: 50, saturation: 85, lightness: 65 },          // Yellow (LUFS yellow)
-            days: { hue: 120, saturation: 70, lightness: 55 },          // Green
-            weeks: { hue: 180, saturation: 75, lightness: 60 },         // Teal (LUFS teal)
-            months: { hue: 210, saturation: 80, lightness: 50 },        // Blue (LUFS blue)
-            quarters: { hue: 270, saturation: 75, lightness: 55 },      // Purple
-            halves: { hue: 300, saturation: 70, lightness: 60 },        // Magenta
-            year: { hue: 0, saturation: 0, lightness: 95 }              // White (LUFS white)
-        };
-
-        // ROYGBIV Day View color mapping
-        this.dayViewColors = {
-            milliseconds: { hue: 0, saturation: 85, lightness: 60 },    // Red
-            seconds: { hue: 30, saturation: 90, lightness: 65 },        // Orange  
-            minutes: { hue: 60, saturation: 85, lightness: 70 },        // Yellow
-            hours: { hue: 120, saturation: 75, lightness: 60 },         // Green
-            days: { hue: 240, saturation: 80, lightness: 65 }           // Blue
+            hours: { hue: 60, saturation: 85, lightness: 65 },          // Yellow
+            days: { hue: 90, saturation: 70, lightness: 55 },           // Yellow-green
+            dayOfWeek: { hue: 120, saturation: 75, lightness: 60 },     // Green
+            weeks: { hue: 150, saturation: 75, lightness: 60 },         // Blue-green
+            months: { hue: 180, saturation: 80, lightness: 50 },        // Cyan
+            quarters: { hue: 210, saturation: 75, lightness: 55 },      // Blue
+            halves: { hue: 270, saturation: 70, lightness: 60 },        // Purple
+            year: { hue: 0, saturation: 0, lightness: 90 }           // White outermost for framing
         };
     }
+    
+    // Get flowing ROYGBIV color based on time and position
+    getFlowingROYGBIV(ringOffset = 0) {
+        const time = Date.now() * this.waveSpeed;
+        const wavePosition = (time + ringOffset) % this.roygbivSpectrum.length;
+        
+        // Interpolate between adjacent colors in the spectrum
+        const index1 = Math.floor(wavePosition);
+        const index2 = (index1 + 1) % this.roygbivSpectrum.length;
+        const factor = wavePosition - index1;
+        
+        return this.interpolateColors(
+            this.roygbivSpectrum[index1], 
+            this.roygbivSpectrum[index2], 
+            factor
+        );
+    }
+    
+    // Interpolate between two hex colors
+    interpolateColors(color1, color2, factor) {
+        const c1 = this.hexToRgb(color1);
+        const c2 = this.hexToRgb(color2);
+        
+        const r = Math.round(c1.r + (c2.r - c1.r) * factor);
+        const g = Math.round(c1.g + (c2.g - c1.g) * factor);
+        const b = Math.round(c1.b + (c2.b - c1.b) * factor);
+        
+        return `rgb(${r}, ${g}, ${b})`;
+    }
+    
+    // Convert hex to RGB
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+            r: parseInt(result[1], 16),
+            g: parseInt(result[2], 16),
+            b: parseInt(result[3], 16)
+        } : null;
+    }
 
-    getTemporalColor(ringType, intensity = 1.0, alpha = 1.0, viewMode = 'year') {
-        // Use ROYGBIV colors in Day View for inner rings
-        if (viewMode === 'day' && this.dayViewColors[ringType]) {
-            const baseColor = this.dayViewColors[ringType];
-            const adjustedLightness = Math.max(20, Math.min(80, 
-                baseColor.lightness * intensity));
-            return `hsla(${baseColor.hue}, ${baseColor.saturation}%, ${adjustedLightness}%, ${alpha})`;
+    getTemporalColor(ringType, intensity = 1.0, alpha = 1.0, viewMode = 'year', colorTransition = 0) {
+        if (viewMode === 'day') {
+            // Day View: Everything white for clean, meditative appearance
+            switch (ringType) {
+                case 'milliseconds':
+                    return `rgba(255, 255, 255, ${alpha * 0.9})`;
+                    
+                case 'seconds':
+                    return `rgba(255, 255, 255, ${alpha * 0.8})`;
+                    
+                case 'minutes':
+                    return `rgba(255, 255, 255, ${alpha * 0.9})`;
+                    
+                case 'hours':
+                    return `rgba(255, 255, 255, ${alpha * 0.9})`;
+                    
+                case 'dayOfWeek':
+                    return `rgba(255, 255, 255, ${alpha * 0.6})`;
+                    
+                case 'days':
+                    return `rgba(255, 255, 255, ${alpha * 0.5})`;
+                    
+                default:
+                    return `rgba(255, 255, 255, ${alpha * 0.4})`;
+            }
+        } else {
+            // Year View: Use spectral colors with expanded hierarchy
+            const baseColor = this.spectralMap[ringType];
+            if (baseColor) {
+                const adjustedLightness = Math.max(20, Math.min(80, 
+                    baseColor.lightness * intensity));
+                return `hsla(${baseColor.hue}, ${baseColor.saturation}%, ${adjustedLightness}%, ${alpha})`;
+            }
         }
         
-        // Use standard spectral colors for Year View or outer rings
-        const baseColor = this.spectralMap[ringType];
-        const adjustedLightness = Math.max(20, Math.min(80, 
-            baseColor.lightness * intensity));
-        
-        return `hsla(${baseColor.hue}, ${baseColor.saturation}%, ${adjustedLightness}%, ${alpha})`;
+        return this.getLufsColor('white', alpha);
     }
 
     getLufsColor(colorName, alpha = 1.0) {
@@ -231,14 +303,19 @@ class AnimationController {
         this.targetScale = 1.0;
         this.targetRotation = 0;
         
-        // Day View ring size multipliers for optimal readability
+        // Day View ring size multipliers for traditional clock layout
+        // Hour ring moved closer to center, minute ring as outer ring
         this.dayViewRingSizes = {
             milliseconds: 0.15,  // Much smaller, less prominent
             seconds: 0.35,       // Moderate size
-            minutes: 0.60,       // Good visibility
-            hours: 0.85,         // Prominent for hour hand visibility
-            days: 1.0           // Full size to ensure hour hand is visible
+            hours: 0.50,         // Hour ring closer to center (shorter hand)
+            minutes: 0.85,       // Minute ring outer (longer hand)
+            days: 1.0           // Full size to ensure minute hand is visible
         };
+        
+        // Animation state for smooth transitions
+        this.colorTransition = 0; // 0 = Year View colors, 1 = Day View colors
+        this.targetColorTransition = 0;
     }
 
     easeInOutCubic(t) {
@@ -362,11 +439,12 @@ class RenderingEngine {
             { name: 'minutes', thickness: 2.5, alpha: 0.8 },
             { name: 'hours', thickness: 3, alpha: 0.8 },
             { name: 'days', thickness: 3.5, alpha: 0.7 },
-            { name: 'weeks', thickness: 4, alpha: 0.7 },
-            { name: 'months', thickness: 4.5, alpha: 0.6 },
-            { name: 'quarters', thickness: 5, alpha: 0.6 },
-            { name: 'halves', thickness: 5.5, alpha: 0.5 },
-            { name: 'year', thickness: 6, alpha: 0.5 }
+            { name: 'dayOfWeek', thickness: 4, alpha: 0.7 },  // New day-of-week ring
+            { name: 'weeks', thickness: 4.5, alpha: 0.7 },
+            { name: 'months', thickness: 5, alpha: 0.6 },
+            { name: 'quarters', thickness: 5.5, alpha: 0.6 },
+            { name: 'halves', thickness: 6, alpha: 0.5 },
+            { name: 'year', thickness: 6.5, alpha: 0.5 }
         ];
     }
 
@@ -398,6 +476,7 @@ class RenderingEngine {
                 day: Array.from({length: 12}, (_, i) => (i === 0 ? '12' : i.toString()))
             },
             days: Array.from({length: 8}, (_, i) => (i * 4 + 1).toString()),
+            dayOfWeek: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],  // New day-of-week labels
             weeks: Array.from({length: 12}, (_, i) => `W${(i * 4 + 1).toString().padStart(2, '0')}`),
             months: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
             quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
@@ -442,17 +521,18 @@ class RenderingEngine {
         const radius = this.getAdjustedRadius(ring, transform) * transform.scale;
         
         if (viewMode === 'day') {
-            // 12-hour format
+            // 12-hour format with labels positioned well inside the ring for traditional clock appearance
             const hour12Labels = ['12', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11'];
-            
             labels.forEach((label, index) => {
                 if (index < 12) {
                     label.textContent = hour12Labels[index];
                     label.style.display = 'block';
                     
                     const angle = (index / 12) * 2 * Math.PI - Math.PI / 2;
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
+                    // Position labels 25% inside the ring for better traditional clock appearance
+                    const labelRadius = radius * 0.75;
+                    const x = Math.cos(angle) * labelRadius;
+                    const y = Math.sin(angle) * labelRadius;
                     
                     label.style.left = `50%`;
                     label.style.top = `50%`;
@@ -478,6 +558,50 @@ class RenderingEngine {
                 } else {
                     label.style.display = 'none';
                 }
+            });
+        }
+    }
+
+    updateMinuteLabels(labels, viewMode, transform) {
+        const minuteRing = this.ringData.find(r => r.name === 'minutes');
+        const hourRing = this.ringData.find(r => r.name === 'hours');
+        
+        if (viewMode === 'day') {
+            const minuteRadius = this.getAdjustedRadius(minuteRing, transform) * transform.scale;
+            const hourRadius = this.getAdjustedRadius(hourRing, transform) * transform.scale;
+            
+            // Position minute numbers inside the minute ring area, similar to hour numbers
+            const labelRadius = hourRadius + (minuteRadius - hourRadius) * 0.3; // 30% from hour ring toward minute ring
+            
+            // Show minute markers at 5-minute intervals (0, 5, 10, 15, etc.)
+            const minuteLabels = ['00', '05', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55'];
+            
+            labels.forEach((label, index) => {
+                if (index < 12) {
+                    label.textContent = minuteLabels[index];
+                    label.style.display = 'block';
+                    
+                    const angle = (index / 12) * 2 * Math.PI - Math.PI / 2;
+                    const x = Math.cos(angle) * labelRadius;
+                    const y = Math.sin(angle) * labelRadius;
+                    
+                    label.style.left = `50%`;
+                    label.style.top = `50%`;
+                    label.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+                    label.className = 'ring-label minutes';
+                    
+                    // Color minute numbers to match the flowing minute ring color
+                    const minuteColor = colorSystem.getTemporalColor('minutes', 1.0, 1.0, 'day');
+                    label.style.color = minuteColor;
+                    label.style.textShadow = `0 0 6px ${minuteColor}`;
+                } else {
+                    label.style.display = 'none';
+                }
+            });
+        } else {
+            // Hide minute numbers in Year View
+            labels.forEach(label => {
+                label.style.display = 'none';
             });
         }
     }
@@ -548,7 +672,7 @@ class RenderingEngine {
         ctx.restore();
     }
 
-    drawTemporalRing(ringName, angle, positions, transform) {
+    drawTemporalRing(ringName, angle, positions, transform, colorTransition = 0) {
         const ring = this.ringData.find(r => r.name === ringName);
         if (!ring) return;
 
@@ -573,7 +697,7 @@ class RenderingEngine {
         // Draw ring base
         ctx.beginPath();
         ctx.arc(0, 0, adjustedRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = colorSystem.getTemporalColor(ringName, 0.4, ringAlpha * 0.4, transform.viewMode);
+        ctx.strokeStyle = colorSystem.getTemporalColor(ringName, 0.4, ringAlpha * 0.4, transform.viewMode, colorTransition);
         ctx.lineWidth = ring.thickness;
         ctx.stroke();
 
@@ -583,7 +707,7 @@ class RenderingEngine {
         
         ctx.beginPath();
         ctx.arc(0, 0, adjustedRadius, startAngle, endAngle);
-        ctx.strokeStyle = colorSystem.getTemporalColor(ringName, 1.2, ringAlpha, transform.viewMode);
+        ctx.strokeStyle = colorSystem.getTemporalColor(ringName, 1.2, ringAlpha, transform.viewMode, colorTransition);
         ctx.lineWidth = ring.thickness;
         ctx.stroke();
 
@@ -647,12 +771,17 @@ class RenderingEngine {
         this.clear();
         this.drawCosmicBackground(transform);
 
-        // Draw all temporal rings
-        const ringOrder = ['year', 'halves', 'quarters', 'months', 'weeks', 'days', 'hours', 'minutes', 'seconds', 'milliseconds'];
+        // Draw all temporal rings including dayOfWeek
+        const ringOrder = ['year', 'halves', 'quarters', 'months', 'weeks', 'days', 'dayOfWeek', 'hours', 'minutes', 'seconds', 'milliseconds'];
         
         ringOrder.forEach(ringName => {
             if (positions[ringName] !== undefined) {
-                this.drawTemporalRing(ringName, positions[ringName], positions, transform);
+                // Use 12-hour format for hours in Day View
+                let angle = positions[ringName];
+                if (ringName === 'hours' && transform.viewMode === 'day' && positions.hours12 !== undefined) {
+                    angle = positions.hours12;
+                }
+                this.drawTemporalRing(ringName, angle, positions, transform, this.animationController.colorTransition);
             }
         });
 
