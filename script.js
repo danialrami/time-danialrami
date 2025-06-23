@@ -599,27 +599,44 @@ class RenderingEngine {
         const x = Math.cos(indicatorAngle) * radius;
         const y = Math.sin(indicatorAngle) * radius;
 
-        const pulseIntensity = 0.6 + 0.4 * Math.sin(Date.now() * 0.004);
-        const indicatorSize = 3 + pulseIntensity * 2;
+        // Slower, more meditative pulsing animation
+        const pulseIntensity = 0.7 + 0.3 * Math.sin(Date.now() * 0.002);
+        
+        // Smaller, more refined dot sizes - especially for Day View
+        let baseIndicatorSize = viewMode === 'day' ? 1.5 : 2.5;
+        
+        // Further reduce size for inner rings in Day View (milliseconds, seconds)
+        if (viewMode === 'day') {
+            const ringIndex = this.ringData.findIndex(r => r.name === ring.name);
+            if (ringIndex === 0) { // milliseconds
+                baseIndicatorSize = 0.8;
+            } else if (ringIndex === 1) { // seconds
+                baseIndicatorSize = 1.0;
+            } else if (ringIndex === 2) { // minutes
+                baseIndicatorSize = 1.3;
+            }
+        }
+        
+        const indicatorSize = baseIndicatorSize + pulseIntensity * 0.8;
 
-        // Outer glow
+        // Outer glow - more subtle
         ctx.beginPath();
-        ctx.arc(x, y, indicatorSize * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = colorSystem.getTemporalColor(ring.name, 1.0, 0.15 * alpha, viewMode);
+        ctx.arc(x, y, indicatorSize * 2.0, 0, Math.PI * 2);
+        ctx.fillStyle = colorSystem.getTemporalColor(ring.name, 1.0, 0.12 * alpha, viewMode);
         ctx.fill();
 
         // Inner bright dot
         ctx.beginPath();
         ctx.arc(x, y, indicatorSize, 0, Math.PI * 2);
-        ctx.fillStyle = colorSystem.getTemporalColor(ring.name, 1.4, 0.9 * alpha, viewMode);
+        ctx.fillStyle = colorSystem.getTemporalColor(ring.name, 1.4, 0.85 * alpha, viewMode);
         ctx.fill();
 
-        // Connecting line
+        // Connecting line - slightly thinner
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(x, y);
         ctx.strokeStyle = colorSystem.getTemporalColor(ring.name, 1.0, 0.25 * alpha, viewMode);
-        ctx.lineWidth = 1;
+        ctx.lineWidth = viewMode === 'day' ? 0.8 : 1;
         ctx.stroke();
     }
 
