@@ -22,78 +22,82 @@ class TemporalEngine {
     }
 
     getCurrentTimestamp() {
-        const now = performance.now();
-        const systemTime = Date.now();
-        const preciseTime = systemTime + (now - this.lastUpdateTime);
-        this.lastUpdateTime = now;
-        return preciseTime + this.timeOffset;
+        const systemTime = Date.now() + this.timeOffset;
+        return systemTime;
     }
 
-    calculateTemporalPositions() {
-        const now = performance.now();
-        const date = new Date();
-        const positions = {};
+    calculateTemporalPositions(timestamp) {
+         const date = new Date(timestamp);
+         const positions = {};
 
-        // Calculate milliseconds position (0-999ms)
-        const totalMilliseconds = date.getMilliseconds() + (now % 1);
-        positions.milliseconds = (totalMilliseconds / 1000) * 360;
+         // Calculate milliseconds position (0-999ms)
+         const totalMilliseconds = date.getMilliseconds();
+         positions.milliseconds = (totalMilliseconds / 1000) * 360;
 
-        // Calculate seconds position (0-59s)
-        const totalSeconds = date.getSeconds() + (totalMilliseconds / 1000);
-        positions.seconds = (totalSeconds / 60) * 360;
+         // Calculate seconds position (0-59s)
+         const totalSeconds = date.getSeconds() + (totalMilliseconds / 1000);
+         positions.seconds = (totalSeconds / 60) * 360;
 
-        // Calculate minutes position (0-59min)
-        const totalMinutes = date.getMinutes() + (totalSeconds / 60);
-        positions.minutes = (totalMinutes / 60) * 360;
+         // Calculate minutes position (0-59min)
+         const totalMinutes = date.getMinutes() + (totalSeconds / 60);
+         positions.minutes = (totalMinutes / 60) * 360;
 
-        // Calculate hours position (0-23h for Year View, 0-11h for Day View)
-        const totalHours = date.getHours() + (totalMinutes / 60);
-        positions.hours = (totalHours / 24) * 360; // Year View: 24-hour
-        positions.hours12 = ((totalHours % 12) / 12) * 360; // Day View: 12-hour
+         // Calculate hours position (0-23h for Year View, 0-11h for Day View)
+         const totalHours = date.getHours() + (totalMinutes / 60);
+         positions.hours = (totalHours / 24) * 360; // Year View: 24-hour
+         positions.hours12 = ((totalHours % 12) / 12) * 360; // Day View: 12-hour
 
-        // Calculate days position (1-31 days)
-        const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-        const totalDays = date.getDate() + (totalHours / 24);
-        positions.days = (totalDays / daysInMonth) * 360;
+         // Calculate day-of-year as foundation for all year-based calculations
+         const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
+         const daysInYear = ((date.getFullYear() % 4 === 0 && date.getFullYear() % 100 !== 0) || date.getFullYear() % 400 === 0) ? 366 : 365;
+         const hoursIntoDay = date.getHours() + (date.getMinutes() / 60) + (date.getSeconds() / 3600);
+         const progressInYear = (dayOfYear + (hoursIntoDay / 24)) / daysInYear;
 
-        // Calculate day-of-week position (MON-SUN)
-        const dayOfWeek = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
-        const hoursIntoDay = date.getHours() + (date.getMinutes() / 60) + (date.getSeconds() / 3600);
-        const totalDayOfWeek = dayOfWeek + (hoursIntoDay / 24);
-        positions.dayOfWeek = (totalDayOfWeek / 7) * 360;
+         // Calculate days position (0-31 days in month, normalized)
+         const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+         const dayInMonth = (date.getDate() - 1) + (hoursIntoDay / 24);
+         positions.days = (dayInMonth / daysInMonth) * 360;
 
-        // Calculate weeks position - FIXED: Use ISO week calculation for W26
-        const isoWeek = this.getISOWeekNumber(date);
-        const weeksInYear = this.getWeeksInYear(date.getFullYear());
-        const dayInWeek = dayOfWeek; // Monday = 0, Sunday = 6
-        const hoursIntoWeek = dayInWeek * 24 + hoursIntoDay;
-        const weekProgress = (isoWeek - 1 + (hoursIntoWeek / (7 * 24))) / weeksInYear;
-        positions.weeks = weekProgress * 360;
+         // Calculate day-of-week position (just the day, not intra-week progress)
+         const dayOfWeek = (date.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+         positions.dayOfWeek = (dayOfWeek / 7) * 360;
 
-        // Calculate months position
-        const totalMonths = date.getMonth() + (totalDays / daysInMonth);
-        positions.months = (totalMonths / 12) * 360;
+         // Calculate weeks position - Use ISO week calculation
+         const isoWeek = this.getISOWeekNumber(date);
+         let weeksInYear = this.getWeeksInYear(date.getFullYear());
+         let weekToUse = isoWeek;
+         
+         // Handle year-end wraparound: if we're in late December and ISO week is 1, 
+         // it's actually week 1 of next year, so use the previous year's week count
+         if (date.getMonth() === 11 && isoWeek === 1) {
+             weeksInYear = this.getWeeksInYear(date.getFullYear() - 1);
+             weekToUse = weeksInYear;
+         }
+         
+         const weekProgress = (weekToUse - 1 + (hoursIntoDay / 24)) / weeksInYear;
+         positions.weeks = weekProgress * 360;
 
-        // Calculate quarters position
-        const quarter = Math.floor(date.getMonth() / 3);
-        const monthInQuarter = date.getMonth() % 3;
-        const totalQuarters = quarter + (monthInQuarter + (totalDays / daysInMonth)) / 3;
-        positions.quarters = (totalQuarters / 4) * 360;
+         // Calculate months position (year-based)
+         const monthInYear = date.getMonth() + (dayInMonth / daysInMonth);
+         positions.months = (monthInYear / 12) * 360;
 
-        // Calculate halves position
-        const half = Math.floor(date.getMonth() / 6);
-        const monthInHalf = date.getMonth() % 6;
-        const totalHalves = half + (monthInHalf + (totalDays / daysInMonth)) / 6;
-        positions.halves = (totalHalves / 2) * 360;
+         // Calculate quarters position (year-based)
+         const quarter = Math.floor(date.getMonth() / 3);
+         const monthInQuarter = date.getMonth() % 3;
+         const totalQuarters = quarter + (monthInQuarter + (dayInMonth / daysInMonth)) / 3;
+         positions.quarters = (totalQuarters / 4) * 360;
 
-        // Calculate year position
-        const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
-        const daysInYear = ((date.getFullYear() % 4 === 0 && date.getFullYear() % 100 !== 0) || date.getFullYear() % 400 === 0) ? 366 : 365;
-        const totalYear = (dayOfYear + (hoursIntoDay / 24)) / daysInYear;
-        positions.year = totalYear * 360;
+         // Calculate halves position (year-based)
+         const half = Math.floor(date.getMonth() / 6);
+         const monthInHalf = date.getMonth() % 6;
+         const totalHalves = half + (monthInHalf + (dayInMonth / daysInMonth)) / 6;
+         positions.halves = (totalHalves / 2) * 360;
 
-        return positions;
-    }
+         // Calculate year position
+         positions.year = progressInYear * 360;
+
+         return positions;
+     }
 
     getISOWeekNumber(date) {
         const target = new Date(date.valueOf());
@@ -107,10 +111,11 @@ class TemporalEngine {
         return 1 + Math.ceil((firstThursday - target) / 604800000);
     }
 
-    getWeeksInYear(year) {
-        const dec31 = new Date(year, 11, 31);
-        return this.getISOWeekNumber(dec31);
-    }
+     getWeeksInYear(year) {
+         const dec31 = new Date(year, 11, 31);
+         const week = this.getISOWeekNumber(dec31);
+         return week === 1 ? 52 : week;
+     }
 
     getDayOfYear(date) {
         const start = new Date(date.getFullYear(), 0, 0);
@@ -172,20 +177,8 @@ class ColorSystem {
             white: '#fbf9e2'
         };
         
-        // ROYGBIV spectrum for flowing wave
-        this.roygbivSpectrum = [
-            '#FF0000', // Red
-            '#FF7F00', // Orange  
-            '#FFFF00', // Yellow
-            '#00FF00', // Green
-            '#0000FF', // Blue
-            '#4B0082', // Indigo
-            '#9400D3'  // Violet
-        ];
-        
-        // Wave parameters for very slow, almost imperceptible effect
-        this.waveSpeed = 0.00002; // Much much slower - almost imperceptible
-        this.waveLength = 4.0;   // How many colors span the wave
+
+
         
         // Enhanced spectral map for Year View with day-of-week ring
         this.spectralMap = {
@@ -202,45 +195,7 @@ class ColorSystem {
             year: { hue: 0, saturation: 0, lightness: 90 }           // White outermost for framing
         };
     }
-    
-    // Get flowing ROYGBIV color based on time and position
-    getFlowingROYGBIV(ringOffset = 0) {
-        const time = Date.now() * this.waveSpeed;
-        const wavePosition = (time + ringOffset) % this.roygbivSpectrum.length;
-        
-        // Interpolate between adjacent colors in the spectrum
-        const index1 = Math.floor(wavePosition);
-        const index2 = (index1 + 1) % this.roygbivSpectrum.length;
-        const factor = wavePosition - index1;
-        
-        return this.interpolateColors(
-            this.roygbivSpectrum[index1], 
-            this.roygbivSpectrum[index2], 
-            factor
-        );
-    }
-    
-    // Interpolate between two hex colors
-    interpolateColors(color1, color2, factor) {
-        const c1 = this.hexToRgb(color1);
-        const c2 = this.hexToRgb(color2);
-        
-        const r = Math.round(c1.r + (c2.r - c1.r) * factor);
-        const g = Math.round(c1.g + (c2.g - c1.g) * factor);
-        const b = Math.round(c1.b + (c2.b - c1.b) * factor);
-        
-        return `rgb(${r}, ${g}, ${b})`;
-    }
-    
-    // Convert hex to RGB
-    hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : null;
-    }
+
 
     getTemporalColor(ringType, intensity = 1.0, alpha = 1.0, viewMode = 'year', colorTransition = 0) {
         if (viewMode === 'day') {
@@ -304,14 +259,14 @@ class AnimationController {
         this.targetRotation = 0;
         
         // Day View ring size multipliers for traditional clock layout
-        // Hour ring moved closer to center, minute ring as outer ring
-        this.dayViewRingSizes = {
-            milliseconds: 0.15,  // Much smaller, less prominent
-            seconds: 0.35,       // Moderate size
-            hours: 0.50,         // Hour ring closer to center (shorter hand)
-            minutes: 0.85,       // Minute ring outer (longer hand)
-            days: 1.0           // Full size to ensure minute hand is visible
-        };
+         // Hour ring moved closer to center, minute ring as outer ring
+         this.dayViewRingSizes = {
+             milliseconds: 0.15,  // Much smaller, less prominent
+             seconds: 0.35,       // Moderate size
+             hours: 0.60,         // Hour ring closer to center (shorter hand)
+             minutes: 0.80,       // Minute ring outer (longer hand)
+             days: 1.0           // Full size to ensure minute hand is visible
+         };
         
         // Animation state for smooth transitions
         this.colorTransition = 0; // 0 = Year View colors, 1 = Day View colors
@@ -464,57 +419,55 @@ class RenderingEngine {
         return ring.baseRadius;
     }
 
-    initializeRingLabels() {
-        this.labelsContainer.innerHTML = '';
-        
-        const ringLabels = {
-            milliseconds: Array.from({length: 10}, (_, i) => (i * 100).toString()),
-            seconds: Array.from({length: 12}, (_, i) => (i * 5).toString()),
-            minutes: Array.from({length: 12}, (_, i) => (i * 5).toString()),
-            hours: {
-                year: Array.from({length: 24}, (_, i) => (i + 1).toString()),
-                day: Array.from({length: 12}, (_, i) => (i === 0 ? '12' : i.toString()))
-            },
-            days: Array.from({length: 8}, (_, i) => (i * 4 + 1).toString()),
-            dayOfWeek: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],  // New day-of-week labels
-            weeks: Array.from({length: 12}, (_, i) => `W${(i * 4 + 1).toString().padStart(2, '0')}`),
-            months: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
-            quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
-            halves: ['H1', 'H2'],
-            year: ['JAN', 'APR', 'JUL', 'OCT']
-        };
+     initializeRingLabels() {
+         this.labelsContainer.innerHTML = '';
+         
+         const ringLabels = {
+             milliseconds: Array.from({length: 10}, (_, i) => (i * 100).toString()),
+             seconds: Array.from({length: 12}, (_, i) => (i * 5).toString()),
+             minutes: Array.from({length: 12}, (_, i) => (i * 5).toString()),
+             hours: Array.from({length: 24}, (_, i) => (i + 1).toString()),
+             days: Array.from({length: 8}, (_, i) => (i * 4 + 1).toString()),
+             dayOfWeek: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'],
+              weeks: Array.from({length: 52}, (_, i) => `W${(i + 1).toString().padStart(2, '0')}`),
+             months: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'],
+             quarters: ['Q1', 'Q2', 'Q3', 'Q4'],
+             halves: ['H1', 'H2'],
+             year: ['JAN', 'APR', 'JUL', 'OCT']
+         };
 
-        this.ringData.forEach((ring, ringIndex) => {
-            const labels = ringLabels[ring.name];
-            const labelsToUse = ring.name === 'hours' ? labels.year : labels;
-            
-            labelsToUse.forEach((label, labelIndex) => {
-                const labelElement = document.createElement('div');
-                labelElement.className = `ring-label ${ring.name}`;
-                labelElement.textContent = label;
-                labelElement.dataset.ring = ring.name;
-                labelElement.dataset.index = labelIndex;
-                this.labelsContainer.appendChild(labelElement);
-            });
-        });
+         this.ringData.forEach((ring, ringIndex) => {
+             const labels = ringLabels[ring.name];
+             
+             labels.forEach((label, labelIndex) => {
+                 const labelElement = document.createElement('div');
+                 labelElement.className = `ring-label ${ring.name}`;
+                 labelElement.textContent = label;
+                 labelElement.dataset.ring = ring.name;
+                 labelElement.dataset.index = labelIndex;
+                 this.labelsContainer.appendChild(labelElement);
+             });
+         });
 
         this.updateRingLabels('year');
     }
 
     updateRingLabels(viewMode) {
-        const transform = this.animationController.getViewTransform();
-        
-        this.ringData.forEach((ring, ringIndex) => {
-            const labels = this.labelsContainer.querySelectorAll(`.ring-label.${ring.name}`);
-            
-            // Handle hour ring transition between 24h and 12h
-            if (ring.name === 'hours') {
-                this.updateHourLabels(labels, viewMode, transform);
-            } else {
-                this.updateRegularLabels(labels, ring, transform, viewMode);
-            }
-        });
-    }
+         const transform = this.animationController.getViewTransform();
+         
+         this.ringData.forEach((ring, ringIndex) => {
+             const labels = this.labelsContainer.querySelectorAll(`.ring-label.${ring.name}`);
+             
+             // Handle hour ring transition between 24h and 12h
+             if (ring.name === 'hours') {
+                 this.updateHourLabels(labels, viewMode, transform);
+             } else if (ring.name === 'minutes') {
+                 this.updateMinuteLabels(labels, viewMode, transform);
+             } else {
+                 this.updateRegularLabels(labels, ring, transform, viewMode);
+             }
+         });
+     }
 
     updateHourLabels(labels, viewMode, transform) {
         const ring = this.ringData.find(r => r.name === 'hours');
@@ -541,25 +494,25 @@ class RenderingEngine {
                     label.style.display = 'none';
                 }
             });
-        } else {
-            // 24-hour format
-            labels.forEach((label, index) => {
-                if (index < 24) {
-                    label.textContent = (index + 1).toString();
-                    label.style.display = 'block';
-                    
-                    const angle = (index / 24) * 2 * Math.PI - Math.PI / 2;
-                    const x = Math.cos(angle) * radius;
-                    const y = Math.sin(angle) * radius;
-                    
-                    label.style.left = `50%`;
-                    label.style.top = `50%`;
-                    label.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
-                } else {
-                    label.style.display = 'none';
-                }
-            });
-        }
+         } else {
+             // 24-hour format (0-23)
+             labels.forEach((label, index) => {
+                 if (index < 24) {
+                     label.textContent = index.toString();
+                     label.style.display = 'block';
+                     
+                     const angle = (index / 24) * 2 * Math.PI - Math.PI / 2;
+                     const x = Math.cos(angle) * radius;
+                     const y = Math.sin(angle) * radius;
+                     
+                     label.style.left = `50%`;
+                     label.style.top = `50%`;
+                     label.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+                 } else {
+                     label.style.display = 'none';
+                 }
+             });
+         }
     }
 
     updateMinuteLabels(labels, viewMode, transform) {

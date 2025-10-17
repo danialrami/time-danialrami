@@ -192,38 +192,20 @@ body::after {
 }
 
 .ring-label {
-    position: absolute;
-    font-size: 10px;
-    font-weight: 500;
-    color: rgba(251, 249, 226, 0.5);
-    text-shadow: 
-        0 0 4px rgba(0, 0, 0, 0.9),
-        0 0 8px rgba(120, 190, 186, 0.2);
-    font-family: 'Courier New', monospace;
-    letter-spacing: 0.8px;
-    transform: translate(-50%, -50%);
-    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
-    user-select: none;
-    text-align: center;
-    white-space: nowrap;
-}
-
-/* Ring labels - with animated transitions */
-.ring-label {
-    position: absolute;
-    font-size: 10px;
-    font-weight: 500;
-    color: rgba(251, 249, 226, 0.5);
-    text-shadow: 
-        0 0 4px rgba(0, 0, 0, 0.9),
-        0 0 8px rgba(120, 190, 186, 0.2);
-    font-family: 'Courier New', monospace;
-    letter-spacing: 0.8px;
-    transform: translate(-50%, -50%);
-    transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
-    user-select: none;
-    text-align: center;
-    white-space: nowrap;
+     position: absolute;
+     font-size: 10px;
+     font-weight: 500;
+     color: rgba(251, 249, 226, 0.5);
+     text-shadow: 
+         0 0 4px rgba(0, 0, 0, 0.9),
+         0 0 8px rgba(120, 190, 186, 0.2);
+     font-family: 'Courier New', monospace;
+     letter-spacing: 0.8px;
+     transform: translate(-50%, -50%);
+     transition: all 1s cubic-bezier(0.4, 0, 0.2, 1);
+     user-select: none;
+     text-align: center;
+     white-space: nowrap;
 }
 
 .ring-label.milliseconds { font-size: 7px; opacity: 0.6; }
